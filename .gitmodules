@@ -1,0 +1,6 @@
+[submodule "nextBrain-back"]
+	path = nextBrain-back
+	url = https://github.com/abderbj/nextBrain-back.git
+[submodule "next-ora"]
+	path = next-ora
+	url = https://github.com/Ziedmach/next-ora.git
