@@ -1,0 +1,25 @@
+{
+  "name": "nextbrain-full-stack",
+  "version": "1.0.0",
+  "description": "NextBrain Full Stack Application",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd nextBrain-back && npm run start:dev",
+    "dev:frontend": "cd next-ora && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd nextBrain-back && npm run build",
+    "build:frontend": "cd next-ora && npm run build",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd nextBrain-back && npm run start:prod",
+    "start:frontend": "cd next-ora && npm run preview",
+    "docker:start": "docker-compose up -d",
+    "docker:stop": "docker-compose down",
+    "docker:dev": "docker-compose -f docker-compose.dev.yml up -d",
+    "docker:build": "docker-compose up -d --build",
+    "docker:logs": "docker-compose logs -f",
+    "docker:reset": "docker-compose down -v && docker-compose up -d --build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

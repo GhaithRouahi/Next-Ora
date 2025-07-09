@@ -1,0 +1,81 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: nextbrain-postgres
+    environment:
+      POSTGRES_USER: nextbrain
+      POSTGRES_PASSWORD: nextbrain123
+      POSTGRES_DB: nextbrain
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./nextBrain-back/prisma/init.sql:/docker-entrypoint-initdb.d/
+    ports:
+      - "5432:5432"
+    networks:
+      - nextbrain-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextbrain -d nextbrain"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./nextBrain-back
+      dockerfile: Dockerfile
+    container_name: nextbrain-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://nextbrain:nextbrain123@postgres:5432/nextbrain?schema=public
+      JWT_SECRET: your_jwt_secret_key_change_in_production
+      JWT_REFRESH_SECRET: your_jwt_refresh_secret_key_change_in_production
+      BACKEND_URL: http://localhost:3000
+      FRONTEND_URL: http://localhost:8080
+      BASE_URL: http://localhost:3000
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: gaithrouahi@gmail.com
+      SMTP_PASS: ""
+      MAIL_FROM_NAME: NextBrain
+      # AI Services Configuration
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyDQJwyVvyvAmuSLpl4bRgSRieuIVsOjsuQ}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - nextbrain-network
+    volumes:
+      - ./nextBrain-back/uploads:/app/uploads
+    command: >
+      sh -c "npx prisma migrate deploy &&
+             npx prisma db seed &&
+             npm run start:prod"
+
+  # Frontend
+  frontend:
+    build:
+      context: ./next-ora
+      dockerfile: Dockerfile
+    container_name: nextbrain-frontend
+    environment:
+      VITE_API_URL: http://localhost:3000/api
+      VITE_APP_NAME: NextOra
+      VITE_APP_VERSION: 1.0.0
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend
+    networks:
+      - nextbrain-network
+
+networks:
+  nextbrain-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
