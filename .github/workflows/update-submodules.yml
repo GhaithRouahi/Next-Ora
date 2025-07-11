@@ -2,7 +2,7 @@ name: Auto Update Submodules
 
 on:
   schedule:
-    - cron: '0/1 * * * *'  # Runs every hour (adjust as needed)
+    - cron: '* 1 * * *'  # Runs every .. (adjust as needed)
   workflow_dispatch:     # Allow manual trigger
 
 jobs:
