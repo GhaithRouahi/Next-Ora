@@ -114,6 +114,52 @@ The application consists of three main services:
 - **Backend** (port 3000): NestJS API server
 - **Database** (port 5432): PostgreSQL database
 
+## ⚙️ Environment Configuration
+
+### Setting up Environment Variables
+
+1. **For Docker deployment**:
+   ```bash
+   # Copy the Docker template
+   cp .env.docker .env
+   
+   # Edit the file and update the values
+   notepad .env  # On Windows
+   # nano .env   # On Linux/Mac
+   ```
+
+2. **For local development**:
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Backend environment
+   cd nextBrain-back
+   cp .env.example .env
+   
+   # Frontend environment
+   cd next-ora
+   cp .env.example .env
+   ```
+
+### Required Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `POSTGRES_PASSWORD` | Database password | Yes |
+| `JWT_SECRET` | JWT signing secret (min 32 chars) | Yes |
+| `JWT_REFRESH_SECRET` | JWT refresh token secret | Yes |
+| `GEMINI_API_KEY` | Google Gemini AI API key | Yes |
+| `SMTP_USER` | Email for notifications | Optional |
+| `SMTP_PASS` | Email password/app password | Optional |
+
+### Security Best Practices
+
+- ⚠️ **Never commit `.env` files** to version control
+- 🔑 Use strong, unique passwords and secrets
+- 🔄 Rotate JWT secrets regularly in production
+- 📧 Use app passwords for Gmail SMTP
+
 ## 🛠️ Development
 
 ### Local Development (without Docker)
@@ -139,22 +185,15 @@ The Docker setup automatically:
 - Runs migrations
 - Seeds initial data
 
-## 📝 Environment Variables
-
-Key environment variables (see `.env.docker` for full list):
-
-- `JWT_SECRET`: JWT signing secret (change in production)
-- `POSTGRES_PASSWORD`: Database password
-- `SMTP_*`: Email configuration for notifications
-
-## 🔒 Security Notes
+##  Security Notes
 
 For production deployment:
 1. Change default JWT secrets
-2. Use strong database password
+2. Use strong database password  
 3. Configure proper SMTP settings
 4. Set up SSL certificates
 5. Use environment-specific configurations
+6. Never expose API keys in client-side code
 
 ## 📖 Additional Documentation
 
