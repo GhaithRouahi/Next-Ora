@@ -55,10 +55,23 @@ services:
       - /app/node_modules
       - ./nextBrain-back/uploads:/app/uploads
     command: >
-      sh -c "npm install &&
-             npx prisma generate &&
-             npx prisma migrate deploy &&
-             npm run start:dev"
+      sh -c "
+        if [ \"$NODE_ENV\" = \"production\" ]; then
+          echo 'Running in production mode';
+          npx prisma migrate deploy && 
+          if [ ! -d \"dist\" ]; then 
+            echo 'Building application for production';
+            npm run build; 
+          fi &&
+          npm run start:prod;
+        else
+          echo 'Running in development mode';
+          npm install && 
+          npm install -g @nestjs/cli &&
+          npx prisma generate && 
+          npx prisma migrate deploy && 
+          npm run start:dev;
+        fi"
 
   # Frontend
   frontend:
