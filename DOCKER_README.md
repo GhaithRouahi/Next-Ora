@@ -1,98 +1,185 @@
-# NextBrain Docker Setup
+# NextOra Docker Deployment Guide
 
-This document explains how to run the NextBrain application using Docker and Docker Compose.
+This guide explains how to deploy NextOra using Docker, with automatic configuration for both local development and VM deployment.
 
-## Prerequisites
+## 🚀 Quick Start
 
-- Docker Desktop installed and running
-- Docker Compose (usually included with Docker Desktop)
+### Prerequisites
+- Docker and Docker Compose installed
+- Git (to clone the repository)
 
-## Quick Start
-
-1. **Clone the repository** (if not already done):
-   ```bash
-   git clone <repository-url>
-   cd Next-brain
-   ```
-
-2. **Set up environment variables** (optional):
-   ```bash
-   cp .env.docker .env
-   ```
-   Edit the `.env` file to customize configuration if needed.
-
-3. **Start the application**:
-   ```bash
-   docker-compose up -d
-   ```
-
-4. **Access the application**:
-   - Frontend: http://localhost:8080
-   - Backend API: http://localhost:3000
-   - PostgreSQL: localhost:5432
-
-## Services
-
-The Docker Compose setup includes:
-
-- **postgres**: PostgreSQL 15 database
-- **ollama**: Ollama server for Llama AI models (port 11434)
-- **backend**: NestJS API server (Node.js)
-- **frontend**: React/Vite frontend application
-
-## AI Services Configuration
-
-### Llama (via Ollama)
-- **Ollama server**: http://localhost:11434
-- **Model**: llama3.2 (automatically downloaded on first run)
-- **No API key required**
-
-### Gemini (Google AI)
-- **API key required**: Get from https://makersuite.google.com/app/apikey
-- **Set environment variable**: `GEMINI_API_KEY=your_actual_key`
-
-## Environment Variables
-
-Key environment variables for AI services:
-
-- `LLAMA_API_URL`: http://ollama:11434/api/chat (default)
-- `GEMINI_API_KEY`: Your Gemini API key (required for Gemini functionality)
-
-## Quick Start
-
-1. **Set up environment variables**:
-   ```bash
-   cp .env.docker .env
-   # Edit .env file and set your GEMINI_API_KEY
-   ```
-
-2. **Start the application**:
-   ```bash
-   docker-compose up -d
-   ```
-
-3. **Download Llama model** (first time only):
-   ```bash
-   docker-compose exec ollama ollama pull llama3.2
-   ```
-
-4. **Test AI services**:
-   ```bash
-   # Windows
-   ./test-ai-services.bat
-   
-   # Linux/Mac
-   ./test-ai-services.sh
-   ```
-
-## Commands
-
-### Start all services
+### Local Development
 ```bash
+# Windows PowerShell
+.\deploy.ps1
+
+# Linux/Unix
+./deploy.sh
+```
+
+### VM Deployment
+```bash
+# Windows PowerShell
+.\deploy.ps1 -Environment vm
+
+# Linux/Unix
+./deploy.sh -e vm
+```
+
+## 📋 Configuration
+
+### Environment Setup
+
+1. **Copy the environment template:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Edit `.env` file:**
+   ```bash
+   # For Local Development
+   HOST_IP=localhost
+   NODE_ENV=development
+   DOCKERFILE=Dockerfile.dev
+
+   # For VM Deployment
+   HOST_IP=10.9.21.110  # Your VM IP
+   NODE_ENV=production
+   DOCKERFILE=Dockerfile
+   ```
+
+### Key Environment Variables
+
+| Variable | Description | Local Value | VM Value |
+|----------|-------------|-------------|----------|
+| `HOST_IP` | Server IP address | `localhost` | Your VM IP (e.g., `10.9.21.110`) |
+| `NODE_ENV` | Environment mode | `development` | `production` |
+| `DOCKERFILE` | Docker file to use | `Dockerfile.dev` | `Dockerfile` |
+
+## 🛠 Deployment Commands
+
+### Using Deployment Scripts (Recommended)
+
+#### Windows PowerShell
+```powershell
+# Local development
+.\deploy.ps1
+
+# VM deployment
+.\deploy.ps1 -Environment vm
+
+# Build and start
+.\deploy.ps1 -Build
+
+# Stop containers
+.\deploy.ps1 -Action down
+
+# Restart containers
+.\deploy.ps1 -Action restart
+
+# Show help
+.\deploy.ps1 -Help
+```
+
+#### Linux/Unix Bash
+```bash
+# Local development
+./deploy.sh
+
+# VM deployment
+./deploy.sh -e vm
+
+# Build and start
+./deploy.sh -b
+
+# Stop containers
+./deploy.sh -a down
+
+# Restart containers
+./deploy.sh -a restart
+
+# Show help
+./deploy.sh -h
+```
+
+### Manual Docker Compose
+
+#### For Local Development
+```bash
+# Set environment variables
+export HOST_IP=localhost
+export NODE_ENV=development
+export DOCKERFILE=Dockerfile.dev
+
+# Start services
+docker-compose up -d
+
+# With development overrides
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
+
+#### For VM Deployment
+```bash
+# Set environment variables
+export HOST_IP=10.9.21.110  # Your VM IP
+export NODE_ENV=production
+export DOCKERFILE=Dockerfile
+
+# Start services
 docker-compose up -d
 ```
 
-### View logs
+## 🌐 Access URLs
+
+After successful deployment:
+
+### Local Development
+- **Frontend:** http://localhost:8080
+- **Backend API:** http://localhost:3000
+- **Database:** localhost:5432
+
+### VM Deployment
+- **Frontend:** http://10.9.21.110:8080
+- **Backend API:** http://10.9.21.110:3000
+- **Database:** 10.9.21.110:5432
+
+## 📊 Service Architecture
+
+The application consists of three main services:
+
+1. **PostgreSQL Database**
+   - Port: 5432
+   - Health checks enabled
+   - Persistent data storage
+
+2. **Backend API (NestJS)**
+   - Port: 3000
+   - JWT authentication
+   - Prisma ORM
+   - AI services integration
+
+3. **Frontend (React/Vite)**
+   - Port: 8080
+   - Environment-aware API connections
+   - Hot reload in development
+
+## 🔧 Development Features
+
+### Development Mode Benefits
+- **Hot Reload:** Code changes reflect immediately
+- **Debug Ports:** Backend debugging on port 9229
+- **Volume Mounts:** Live code editing
+- **Enhanced Logging:** Detailed development logs
+
+### Production Mode Benefits
+- **Optimized Builds:** Minified and optimized code
+- **Health Checks:** Container health monitoring
+- **Security:** Production-ready JWT secrets
+- **Performance:** Optimized container images
+
+## 📝 Monitoring and Logs
+
+### View Logs
 ```bash
 # All services
 docker-compose logs -f
@@ -100,117 +187,121 @@ docker-compose logs -f
 # Specific service
 docker-compose logs -f backend
 docker-compose logs -f frontend
+docker-compose logs -f postgres
 ```
 
-### Stop all services
+### Health Checks
 ```bash
-docker-compose down
-```
-
-### Rebuild and restart
-```bash
-docker-compose down
-docker-compose up -d --build
-```
-
-### Reset database (WARNING: This will delete all data)
-```bash
-docker-compose down -v
-docker-compose up -d
-```
-
-## Development
-
-For development with hot-reload:
-
-1. **Backend development**:
-   ```bash
-   # Stop only the backend container
-   docker-compose stop backend
-   
-   # Run backend locally
-   cd nextBrain-back
-   npm install
-   npm run start:dev
-   ```
-
-2. **Frontend development**:
-   ```bash
-   # Stop only the frontend container
-   docker-compose stop frontend
-   
-   # Run frontend locally
-   cd next-ora
-   npm install
-   npm run dev
-   ```
-
-## Environment Variables
-
-Key environment variables for production:
-
-- `JWT_SECRET`: Change this to a secure random string
-- `JWT_REFRESH_SECRET`: Change this to a different secure random string
-- `POSTGRES_PASSWORD`: Use a strong password
-- `SMTP_*`: Configure email settings for notifications
-
-## Troubleshooting
-
-### Database connection issues
-```bash
-# Check if postgres is running
+# Check container status
 docker-compose ps
 
-# Check postgres logs
-docker-compose logs postgres
-
-# Restart postgres
-docker-compose restart postgres
+# Health check status
+docker inspect nextbrain-postgres --format='{{.State.Health.Status}}'
 ```
 
-### Backend not starting
+## 🛑 Stopping Services
+
 ```bash
-# Check backend logs
-docker-compose logs backend
+# Using deployment script
+.\deploy.ps1 -Action down  # Windows
+./deploy.sh -a down        # Linux
 
-# Rebuild backend
-docker-compose up -d --build backend
-```
+# Using Docker Compose
+docker-compose down
 
-### Frontend not accessible
-```bash
-# Check frontend logs
-docker-compose logs frontend
-
-# Check if port 8080 is available
-netstat -an | findstr :8080
-```
-
-### Reset everything
-```bash
-# Stop all services and remove volumes
+# Remove volumes (⚠️ This will delete database data)
 docker-compose down -v
+```
 
-# Remove all images
-docker-compose down --rmi all
+## 🔍 Troubleshooting
+
+### Common Issues
+
+1. **Port Conflicts**
+   ```bash
+   # Check if ports are in use
+   netstat -an | grep :8080
+   netstat -an | grep :3000
+   netstat -an | grep :5432
+   ```
+
+2. **Environment Variables**
+   ```bash
+   # Verify .env file exists and has correct values
+   cat .env
+   ```
+
+3. **Container Health**
+   ```bash
+   # Check container status
+   docker-compose ps
+   
+   # Check logs for errors
+   docker-compose logs backend
+   ```
+
+4. **Network Connectivity**
+   ```bash
+   # Test backend connection
+   curl http://localhost:3000/api/health
+   
+   # For VM deployment
+   curl http://10.9.21.110:3000/api/health
+   ```
+
+### Reset Everything
+```bash
+# Stop and remove everything
+docker-compose down -v --remove-orphans
+
+# Remove built images
+docker-compose build --no-cache
 
 # Start fresh
-docker-compose up -d --build
+.\deploy.ps1 -Build  # Windows
+./deploy.sh -b       # Linux
 ```
 
-## Production Deployment
+## 🔐 Security Considerations
 
-For production deployment:
+### For Production VM Deployment
 
-1. Update environment variables in `.env` file
-2. Use proper secrets management
-3. Configure reverse proxy (nginx/Apache)
-4. Set up SSL certificates
-5. Configure database backups
-6. Monitor logs and performance
+1. **Change Default Secrets:**
+   ```bash
+   # Update in .env file
+   JWT_SECRET=your_secure_jwt_secret
+   JWT_REFRESH_SECRET=your_secure_refresh_secret
+   POSTGRES_PASSWORD=your_secure_db_password
+   ```
 
-## Data Persistence
+2. **Firewall Configuration:**
+   ```bash
+   # Allow specific ports only
+   ufw allow 8080/tcp  # Frontend
+   ufw allow 3000/tcp  # Backend
+   ufw deny 5432/tcp   # Database (internal only)
+   ```
 
-- Database data is persisted in a Docker volume
-- User uploads are persisted in `./nextBrain-back/uploads`
-- To backup data, copy the uploads folder and export the database
+3. **SSL/TLS (Recommended):**
+   - Use reverse proxy (nginx, traefik)
+   - Configure SSL certificates
+   - Update URLs to use HTTPS
+
+## 📱 Mobile Development
+
+For mobile app development, ensure the VM IP is accessible from mobile devices:
+
+```bash
+# Test from mobile device browser
+http://10.9.21.110:8080
+```
+
+## 🆘 Support
+
+If you encounter issues:
+
+1. Check the logs: `docker-compose logs -f`
+2. Verify environment variables in `.env`
+3. Ensure Docker and Docker Compose are updated
+4. Check network connectivity between services
+5. Review the troubleshooting section above

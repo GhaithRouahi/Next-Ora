@@ -4,9 +4,9 @@ services:
     image: postgres:15-alpine
     container_name: nextbrain-postgres
     environment:
-      POSTGRES_USER: nextbrain
-      POSTGRES_PASSWORD: nextbrain123
-      POSTGRES_DB: nextbrain
+      POSTGRES_USER: ${POSTGRES_USER:-nextbrain}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nextbrain123}
+      POSTGRES_DB: ${POSTGRES_DB:-nextbrain}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./nextBrain-back/prisma/init.sql:/docker-entrypoint-initdb.d/
@@ -15,7 +15,7 @@ services:
     networks:
       - nextbrain-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nextbrain -d nextbrain"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nextbrain} -d ${POSTGRES_DB:-nextbrain}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,23 +24,24 @@ services:
   backend:
     build:
       context: ./nextBrain-back
-      dockerfile: Dockerfile
+      dockerfile: ${DOCKERFILE:-Dockerfile}
     container_name: nextbrain-backend
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 3000
-      DATABASE_URL: postgres://nextbrain:nextbrain123@postgres:5432/nextbrain?schema=public
-      JWT_SECRET: your_jwt_secret_key_change_in_production
-      JWT_REFRESH_SECRET: your_jwt_refresh_secret_key_change_in_production
-      BACKEND_URL: http://10.9.21.110:3000
-      FRONTEND_URL: http://10.9.21.110:8080
-      BASE_URL: http://10.9.21.110:3000
-      SMTP_HOST: smtp.gmail.com
-      SMTP_PORT: 587
-      SMTP_USER: gaithrouahi@gmail.com
-      SMTP_PASS: ""
-      MAIL_FROM_NAME: NextBrain
+      DATABASE_URL: postgres://${POSTGRES_USER:-nextbrain}:${POSTGRES_PASSWORD:-nextbrain123}@postgres:5432/${POSTGRES_DB:-nextbrain}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-your_jwt_secret_key_change_in_production}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-your_jwt_refresh_secret_key_change_in_production}
+      BACKEND_URL: http://${HOST_IP:-localhost}:3000
+      FRONTEND_URL: http://${HOST_IP:-localhost}:8080
+      BASE_URL: http://${HOST_IP:-localhost}:3000
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-gaithrouahi@gmail.com}
+      SMTP_PASS: ${SMTP_PASS:-xubl hogw wrdx uwgi}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-NextBrain}
       # AI Services Configuration
+      LLAMA_API_URL: ${LLAMA_API_URL:-http://host.docker.internal:11434/api/chat}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyDQJwyVvyvAmuSLpl4bRgSRieuIVsOjsuQ}
     ports:
       - "3000:3000"
@@ -50,30 +51,37 @@ services:
     networks:
       - nextbrain-network
     volumes:
+      - ./nextBrain-back:/app
+      - /app/node_modules
       - ./nextBrain-back/uploads:/app/uploads
     command: >
-      sh -c "npx prisma migrate deploy &&
-             npx prisma db seed &&
-             npm run start:prod"
+      sh -c "npm install &&
+             npx prisma generate &&
+             npx prisma migrate deploy &&
+             npm run start:dev"
 
   # Frontend
   frontend:
     build:
       context: ./next-ora
-      dockerfile: Dockerfile
+      dockerfile: ${DOCKERFILE:-Dockerfile}
       args:
-        VITE_API_URL: http://10.9.21.110:3000/api
+        VITE_API_URL: http://${HOST_IP:-localhost}:3000/api
     container_name: nextbrain-frontend
     environment:
-      VITE_API_URL: http://10.9.21.110:3000/api
+      VITE_API_URL: http://${HOST_IP:-localhost}:3000/api
       VITE_APP_NAME: NextOra
       VITE_APP_VERSION: 1.0.0
+      VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY:-${GEMINI_API_KEY}}
     ports:
       - "8080:8080"
     depends_on:
       - backend
     networks:
       - nextbrain-network
+    volumes:
+      - ./next-ora:/app
+      - /app/node_modules
 
 networks:
   nextbrain-network:
