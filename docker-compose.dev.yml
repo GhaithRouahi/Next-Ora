@@ -40,12 +40,14 @@ services:
       SMTP_PASS: ""
       MAIL_FROM_NAME: NextBrain
       GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyDQJwyVvyvAmuSLpl4bRgSRieuIVsOjsuQ}
-      LLAMA_API_URL: http://localhost:11434/api/chat
+      LLAMA_API_URL: http://ollama:11434/api/chat
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_started
     volumes:
       - ./nextBrain-back:/app
       - /app/node_modules
@@ -74,9 +76,30 @@ services:
       - nextbrain-network
     restart: unless-stopped
 
+  # Ollama AI Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nextbrain-ollama-dev
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data_dev:/root/.ollama
+    networks:
+      - nextbrain-network
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 networks:
   nextbrain-network:
     driver: bridge
 
 volumes:
   postgres_data_dev:
+  ollama_data_dev:

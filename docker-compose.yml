@@ -42,12 +42,14 @@ services:
       MAIL_FROM_NAME: NextBrain
       # AI Services Configuration
       GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyDQJwyVvyvAmuSLpl4bRgSRieuIVsOjsuQ}
-      LLAMA_API_URL: http://10.9.21.254:11434/api/chat
+      LLAMA_API_URL: http://ollama:11434/api/chat
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
+      ollama:
+        condition: service_started
     networks:
       - nextbrain-network
     volumes:
@@ -76,9 +78,38 @@ services:
     networks:
       - nextbrain-network
 
+  # Ollama AI Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: nextbrain-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - nextbrain-network
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    # For GPU support (uncomment if you have NVIDIA GPU)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
 networks:
   nextbrain-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  ollama_data:
