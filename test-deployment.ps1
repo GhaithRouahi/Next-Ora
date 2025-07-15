@@ -76,6 +76,26 @@ try {
     Write-Host " ❌ $($_.Exception.Message)" -ForegroundColor Red
 }
 
+# Test Llama Service
+Write-Host "  Testing Llama Service ($api_url/llama/health)..." -NoNewline
+try {
+    $response = Invoke-WebRequest -Uri "$api_url/llama/health" -TimeoutSec 15 -UseBasicParsing
+    if ($response.StatusCode -eq 200) {
+        $healthData = $response.Content | ConvertFrom-Json
+        if ($healthData.status -eq "success") {
+            Write-Host " ✅" -ForegroundColor Green
+        } elseif ($healthData.status -eq "warning") {
+            Write-Host " ⚠️  $($healthData.message)" -ForegroundColor Yellow
+        } else {
+            Write-Host " ❌ $($healthData.message)" -ForegroundColor Red
+        }
+    } else {
+        Write-Host " ❌ Status: $($response.StatusCode)" -ForegroundColor Red
+    }
+} catch {
+    Write-Host " ❌ $($_.Exception.Message)" -ForegroundColor Red
+}
+
 Write-Host ""
 Write-Host "🎯 Access URLs:" -ForegroundColor Cyan
 Write-Host "  📱 Frontend: $frontend_url" -ForegroundColor White
