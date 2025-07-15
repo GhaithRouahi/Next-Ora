@@ -42,7 +42,7 @@ services:
       MAIL_FROM_NAME: NextBrain
       # AI Services Configuration
       GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyDQJwyVvyvAmuSLpl4bRgSRieuIVsOjsuQ}
-      LLAMA_API_URL: ${LLAMA_API_URL:-http://host.docker.internal:11434/api/chat}
+      LLAMA_API_URL: ${LLAMA_API_URL:-http://10.9.21.110:11434/api/chat}
     ports:
       - "3000:3000"
     depends_on:
@@ -50,6 +50,8 @@ services:
         condition: service_healthy
     networks:
       - nextbrain-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./nextBrain-back/uploads:/app/uploads
     command: >
