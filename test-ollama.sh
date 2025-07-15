@@ -12,7 +12,7 @@ GRAY='\033[0;37m'
 NC='\033[0m' # No Color
 
 # Configuration
-OLLAMA_HOST="${1:-10.9.21.254}"
+OLLAMA_HOST="${1:-10.9.21.110}"
 OLLAMA_PORT="${2:-11434}"
 OLLAMA_API_URL="http://${OLLAMA_HOST}:${OLLAMA_PORT}/api"
 

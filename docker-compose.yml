@@ -38,18 +38,16 @@ services:
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
       SMTP_USER: gaithrouahi@gmail.com
-      SMTP_PASS: ""
+      SMTP_PASS: "xubl hogw wrdx uwgi"
       MAIL_FROM_NAME: NextBrain
       # AI Services Configuration
       GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyDQJwyVvyvAmuSLpl4bRgSRieuIVsOjsuQ}
-      LLAMA_API_URL: http://ollama:11434/api/chat
+      LLAMA_API_URL: ${LLAMA_API_URL:-http://host.docker.internal:11434/api/chat}
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
-      ollama:
-        condition: service_started
     networks:
       - nextbrain-network
     volumes:
@@ -78,43 +76,9 @@ services:
     networks:
       - nextbrain-network
 
-  # Ollama AI Service
-  ollama:
-    image: ollama/ollama:latest
-    container_name: nextbrain-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    shm_size: 5gb
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      stack:
-        soft: 67108864
-        hard: 67108864
-    networks:
-      - nextbrain-network
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_ORIGINS=*
-      - OLLAMA_NUM_PARALLEL=4
-      - OLLAMA_MAX_LOADED_MODELS=2
-    privileged: true  # Optional: allow full hardware access (e.g., GPU, shared memory)
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-
 networks:
   nextbrain-network:
     driver: bridge
 
 volumes:
   postgres_data:
-  ollama_data:
