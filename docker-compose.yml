@@ -80,52 +80,36 @@ services:
 
   # Ollama AI Service
   ollama:
-    image: ollama/ollama:latest
-    container_name: nextbrain-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    # Performance optimizations
-    shm_size: 5gb  # Increase shared memory for better performance
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      stack:
-        soft: 67108864
-        hard: 67108864
-    networks:
-      - nextbrain-network
-    environment:
-      - OLLAMA_HOST=0.0.0.0
-      - OLLAMA_ORIGINS=*
-      - OLLAMA_NUM_PARALLEL=4
-      - OLLAMA_MAX_LOADED_MODELS=2
-    # Resource allocation for better performance
-    deploy:
-      resources:
-        limits:
-          cpus: '0'  # Use all available CPUs
-          memory: 55G  # Maximum 8GB RAM
-        reservations:
-          cpus: '11.0'  # Reserve 4 CPU cores
-          memory: 7G   # Reserve 4GB RAM
-    # For GPU support (uncomment if you have NVIDIA GPU)
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+  image: ollama/ollama:latest
+  container_name: nextbrain-ollama
+  ports:
+    - "11434:11434"
+  volumes:
+    - ollama_data:/root/.ollama
+  shm_size: 5gb
+  ulimits:
+    memlock:
+      soft: -1
+      hard: -1
+    stack:
+      soft: 67108864
+      hard: 67108864
+  networks:
+    - nextbrain-network
+  environment:
+    - OLLAMA_HOST=0.0.0.0
+    - OLLAMA_ORIGINS=*
+    - OLLAMA_NUM_PARALLEL=4
+    - OLLAMA_MAX_LOADED_MODELS=2
+  privileged: true  # Optional: allow full hardware access (e.g., GPU, shared memory)
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 60s
+
 
 networks:
   nextbrain-network:
