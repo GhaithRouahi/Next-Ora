@@ -1,14 +1,15 @@
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: nextbrain-postgres-dev
+    container_name: nextbrain-postgres
     environment:
       POSTGRES_USER: nextbrain
       POSTGRES_PASSWORD: nextbrain123
       POSTGRES_DB: nextbrain
     volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
-      - ./nextBrain-back/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+      - ./nextBrain-back/prisma/init.sql:/docker-entrypoint-initdb.d/
     ports:
       - "5432:5432"
     networks:
@@ -18,15 +19,15 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
+  # Backend API
   backend:
     build:
       context: ./nextBrain-back
       dockerfile: Dockerfile
-    container_name: nextbrain-backend-dev
+    container_name: nextbrain-backend
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgres://nextbrain:nextbrain123@postgres:5432/nextbrain?schema=public
       JWT_SECRET: your_jwt_secret_key_change_in_production
@@ -34,34 +35,38 @@ services:
       BACKEND_URL: http://localhost:3000
       FRONTEND_URL: http://localhost:8080
       BASE_URL: http://localhost:3000
-      SMTP_HOST: smtp.gmail.com
-      SMTP_PORT: 587
-      SMTP_USER: gaithrouahi@gmail.com
-      SMTP_PASS: ""
+      MAIL_HOST: smtp.gmail.com
+      MAIL_PORT: 587
+      MAIL_USER: gaithrouahi@gmail.com
+      MAIL_PASS: "xubl hogw wrdx uwgi"
       MAIL_FROM_NAME: NextBrain
+      # AI Services Configuration
       GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyDQJwyVvyvAmuSLpl4bRgSRieuIVsOjsuQ}
-      LLAMA_API_URL: ${LLAMA_API_URL:-http://10.9.21.110:11434/api/chat}
+      LLAMA_API_URL: ${LLAMA_API_URL:-http://localhost:11434/api/chat}
     ports:
       - "3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ./nextBrain-back:/app
-      - /app/node_modules
-    command: >
-      sh -c "npm install && npx nodemon --legacy-watch src/main.ts"
     networks:
       - nextbrain-network
-    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./nextBrain-back/uploads:/app/uploads
+    command: >
+      sh -c "npx prisma migrate deploy &&
+             npx prisma db seed &&
+             npm run start:prod"
 
+  # Frontend
   frontend:
     build:
       context: ./next-ora
       dockerfile: Dockerfile
       args:
         VITE_API_URL: http://localhost:3000/api
-    container_name: nextbrain-frontend-dev
+    container_name: nextbrain-frontend
     environment:
       VITE_API_URL: http://localhost:3000/api
       VITE_APP_NAME: NextOra
@@ -72,11 +77,10 @@ services:
       - backend
     networks:
       - nextbrain-network
-    restart: unless-stopped
 
 networks:
   nextbrain-network:
     driver: bridge
 
 volumes:
-  postgres_data_dev:
+  postgres_data:
