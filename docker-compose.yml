@@ -65,7 +65,7 @@ services:
 
   # Vector DB - Chroma server
   chroma:
-    image: chromadb/chroma:0.4.5
+    image: chromadb/chroma:latest
     container_name: nextbrain-chroma
     environment:
       # persist to /chroma/collection
