@@ -64,23 +64,25 @@ services:
              npm run start:prod"
 
   # Vector DB - Chroma server
-#  chroma:
-#    image: chromadb/chroma:latest
-#    container_name: nextbrain-chroma
-#    environment:
-#      CHROMA_DATABASE: duckdb+parquet
-#      CHROMA_DB_IMPL: duckdb+parquet
-#    ports:
-#      - "8000:8000"
-#    volumes:
-#      - chroma_data:/chroma
-#    networks:
-#      - nextbrain-network
-#    healthcheck:
-#      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: nextbrain-chroma
+    environment:
+      CHROMA_DATABASE: duckdb+parquet
+      CHROMA_DB_IMPL: duckdb+parquet
+      ANONYMIZED_TELEMETRY: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - nextbrain-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Frontend
   frontend:
@@ -102,26 +104,27 @@ services:
       - nextbrain-network
 
   # RAG indexing service
-#  rag-service:
-#    build:
-#      context: ./rag-service
-#      dockerfile: Dockerfile
-#    container_name: nextbrain-rag-service
-#    environment:
-#      VECTOR_DB: chroma
-#      VECTOR_DB_URL: http://chroma:8000
-#      CHROMA_DB_DIR: /data/chroma
-#      UPLOAD_DIR: /data/uploads
-#    ports:
-#      - "8001:8001"
-#    depends_on:
-#      chroma:
-#        condition: service_healthy
-#    networks:
-#      - nextbrain-network
-#    volumes:
-#      - ./nextBrain-back/uploads:/data/uploads
-#      - rag_chroma_data:/data/chroma
+  rag-service:
+    build:
+      context: ./rag-service
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    container_name: nextbrain-rag-service
+    environment:
+      VECTOR_DB: chroma
+      VECTOR_DB_URL: http://chroma:8000
+      CHROMA_DB_DIR: /data/chroma
+      UPLOAD_DIR: /data/uploads
+    ports:
+      - "8001:8001"
+    depends_on:
+      chroma:
+        condition: service_healthy
+    networks:
+      - nextbrain-network
+    volumes:
+      - ./nextBrain-back/uploads:/data/uploads
+      - rag_chroma_data:/data/chroma
 
 networks:
   nextbrain-network:
