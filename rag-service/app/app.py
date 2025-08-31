@@ -5,6 +5,7 @@ from pathlib import Path
 import uvicorn
 from app.ingest import initialize_vector_db, extract_content, split_text, ingest_file_to_vector_db, simple_text_embedding, clear_vector_db
 from pydantic import BaseModel
+from typing import Optional
 import google.generativeai as genai
 
 app = FastAPI(title="Vector DB and RAG API")
@@ -46,13 +47,22 @@ async def root():
     return {
         "message": "RAG API is running",
         "endpoints": {
-            "POST /ingest": "Upload and process documents",
-            "POST /query": "Query documents with natural language questions",
+            "POST /ingest": "Upload and process documents (supports category_id parameter)",
+            "POST /query": "Query documents with natural language questions (supports category_id filter)",
             "POST /clear": "Clear the vector database"
         },
-        "example_query": {
+        "ingest_example": {
+            "method": "POST",
+            "url": "/ingest",
+            "form_data": {
+                "file": "your_file.pdf",
+                "category_id": "optional_category_id"
+            }
+        },
+        "query_example": {
             "question": "What are the key elements?",
-            "limit": 5
+            "limit": 5,
+            "category_id": "optional_filter_by_category"
         }
     }
 
@@ -60,13 +70,20 @@ async def root():
 class QueryRequest(BaseModel):
     question: str
     limit: int = 5
+    category_id: Optional[str] = None
+
+class IngestRequest(BaseModel):
+    category_id: Optional[str] = None
 
 # Initialize language model for RAG (commented out for now)
 # generator = pipeline("text-generation", model="distilgpt2")
 
 # Ingestion endpoint
 @app.post("/ingest")
-async def ingest_file(file: UploadFile = File(...)):
+async def ingest_file(
+    file: UploadFile = File(...),
+    category_id: Optional[str] = None
+):
     try:
         # Save uploaded file temporarily
         file_path = f"./temp/{file.filename}"
@@ -77,12 +94,16 @@ async def ingest_file(file: UploadFile = File(...)):
         # Initialize vector DB and embeddings
         client, embedding_model = initialize_vector_db()
 
-        # Use existing ingestion function
-        ingest_file_to_vector_db(file_path, client, embedding_model)
+        # Use existing ingestion function with category_id
+        result = ingest_file_to_vector_db(file_path, client, embedding_model, category_id=category_id)
 
         # Clean up
         os.remove(file_path)
-        return JSONResponse(content={"message": f"Successfully ingested {file.filename}"}, status_code=200)
+
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+
+        return JSONResponse(content=result, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
 
@@ -96,13 +117,29 @@ async def query_documents(request: QueryRequest):
         # Convert question to embedding
         question_embedding = embedding_model(request.question)
 
+        # Prepare search query
+        search_query = {
+            "collection_name": "file_vectors",
+            "query_vector": question_embedding,
+            "limit": request.limit,
+            "with_payload": True
+        }
+
+        # Add category filter if specified
+        if request.category_id:
+            search_query["query_filter"] = {
+                "must": [
+                    {
+                        "key": "category_id",
+                        "match": {
+                            "value": request.category_id
+                        }
+                    }
+                ]
+            }
+
         # Search for similar documents
-        search_result = client.search(
-            collection_name="file_vectors",
-            query_vector=question_embedding,
-            limit=request.limit,
-            with_payload=True
-        )
+        search_result = client.search(**search_query)
 
         # Format results
         results = []
@@ -112,7 +149,8 @@ async def query_documents(request: QueryRequest):
                 "score": hit.score,
                 "content": hit.payload.get("content", ""),
                 "file_path": hit.payload.get("file_path", ""),
-                "chunk_id": hit.payload.get("chunk_id", 0)
+                "chunk_id": hit.payload.get("chunk_id", 0),
+                "category_id": hit.payload.get("category_id", None)
             }
             results.append(result)
             # Collect context for answer generation
@@ -128,7 +166,8 @@ async def query_documents(request: QueryRequest):
             "answer": answer,
             "results": results,
             "total_results": len(results),
-            "context_used": len(context_chunks)
+            "context_used": len(context_chunks),
+            "category_filter": request.category_id
         }, status_code=200)
 
     except Exception as e:
