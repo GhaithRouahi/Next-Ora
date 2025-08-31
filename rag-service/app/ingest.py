@@ -216,9 +216,11 @@ def split_text(text, chunk_size=1000, chunk_overlap=200):
     return text_splitter.split_text(text)
 
 # Ingest file into vector database
-def ingest_file_to_vector_db(file_path, client, embedding_model, collection_name="file_vectors"):
+def ingest_file_to_vector_db(file_path, client, embedding_model, collection_name="file_vectors", category_id=None):
     try:
         print(f"Starting ingestion of: {file_path}")
+        if category_id:
+            print(f"Category ID: {category_id}")
 
         # Extract content based on file type
         content = extract_content(file_path)
@@ -253,13 +255,22 @@ def ingest_file_to_vector_db(file_path, client, embedding_model, collection_name
                 "content": chunk,
                 "content_length": len(chunk)
             }
+
+            # Add category_id to payload if provided
+            if category_id:
+                payload["category_id"] = category_id
+
             points.append(qmodels.PointStruct(id=point_id, vector=vector, payload=payload))
 
         print(f"Storing {len(points)} points in vector database...")
         client.upsert(collection_name=collection_name, points=points)
 
-        print(f"Successfully ingested {file_path} into vector database with {len(chunks)} chunks")
-        return {"message": f"Successfully ingested {len(chunks)} chunks from {file_path}"}
+        result_message = f"Successfully ingested {file_path} into vector database with {len(chunks)} chunks"
+        if category_id:
+            result_message += f" (Category: {category_id})"
+
+        print(result_message)
+        return {"message": result_message, "chunks": len(chunks), "category_id": category_id}
 
     except Exception as e:
         error_msg = f"Error processing {file_path}: {str(e)}"
@@ -287,19 +298,24 @@ def clear_vector_db(collection_name="file_vectors"):
         return {"error": f"Error clearing vector database: {str(e)}"}
 
 # Main function to process multiple files
-def process_files(directory_path, collection_name="file_vectors"):
+def process_files(directory_path, collection_name="file_vectors", category_id=None):
     client, embedding_model = initialize_vector_db(collection_name)
-    
+
     # Supported file extensions
     supported_extensions = {'.txt', '.pdf', '.docx', '.png', '.jpg', '.jpeg'}
-    
+
     # Process all files in directory
     for file_path in Path(directory_path).rglob('*'):
         if file_path.suffix.lower() in supported_extensions:
             print(f"Processing {file_path}...")
-            ingest_file_to_vector_db(file_path, client, embedding_model, collection_name)
+            if category_id:
+                print(f"Using category_id: {category_id}")
+            result = ingest_file_to_vector_db(file_path, client, embedding_model, collection_name, category_id)
+            if "error" in result:
+                print(f"Error processing {file_path}: {result['error']}")
 
 # Example usage
 if __name__ == "__main__":
     directory_path = "./input_files"  # Replace with your directory path
-    process_files(directory_path)
+    category_id = None  # Set to a category ID if needed
+    process_files(directory_path, category_id=category_id)
