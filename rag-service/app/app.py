@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import JSONResponse
 import os
 from pathlib import Path
@@ -81,10 +81,24 @@ class IngestRequest(BaseModel):
 # Ingestion endpoint
 @app.post("/ingest")
 async def ingest_file(
+    request: Request,
     file: UploadFile = File(...),
     category_id: Optional[str] = None
 ):
     try:
+        # If category_id wasn't provided explicitly, try common alternate form keys
+        if not category_id:
+            try:
+                form = await request.form()
+                # check common alternatives
+                for key in ("category_id", "categoryId", "category"):
+                    if key in form and form.get(key) is not None:
+                        category_id = str(form.get(key))
+                        break
+            except Exception:
+                # ignore form parsing errors and proceed
+                pass
+
         # Save uploaded file temporarily
         file_path = f"./temp/{file.filename}"
         os.makedirs("./temp", exist_ok=True)
@@ -95,6 +109,7 @@ async def ingest_file(
         client, embedding_model = initialize_vector_db()
 
         # Use existing ingestion function with category_id
+        print(f"Ingest endpoint detected category_id: {category_id}")
         result = ingest_file_to_vector_db(file_path, client, embedding_model, category_id=category_id)
 
         # Clean up
@@ -125,21 +140,73 @@ async def query_documents(request: QueryRequest):
             "with_payload": True
         }
 
-        # Add category filter if specified
+        # Add category filter if specified. Try to coerce numeric category IDs to int so
+        # they match payloads that may have been stored as integers.
         if request.category_id:
+            match_value = request.category_id
+            # If the category_id looks like an integer, use int type for matching
+            try:
+                if isinstance(request.category_id, str) and request.category_id.isdigit():
+                    match_value = int(request.category_id)
+                elif isinstance(request.category_id, (int,)):
+                    match_value = request.category_id
+            except Exception:
+                match_value = request.category_id
+
             search_query["query_filter"] = {
                 "must": [
                     {
                         "key": "category_id",
                         "match": {
-                            "value": request.category_id
+                            "value": match_value
                         }
                     }
                 ]
             }
 
+        # Debug: log incoming request and search query
+        print(f"RAG query: question={request.question!r}, limit={request.limit}, category_id={request.category_id!r}")
+        print(f"Using search_query: {search_query}")
+
         # Search for similar documents
         search_result = client.search(**search_query)
+
+        # If we filtered by category and got no hits, try a fallback:
+        # perform the same search without the query_filter and post-filter by payload values
+        if request.category_id and (not search_result or len(search_result) == 0):
+            print("No hits for filtered query, attempting fallback search without filter and post-filtering payloads")
+            # prepare search without filter
+            fallback_query = dict(search_query)
+            if "query_filter" in fallback_query:
+                del fallback_query["query_filter"]
+
+            try:
+                fallback_hits = client.search(**fallback_query)
+                print(f"Fallback search returned {len(fallback_hits)} total hits; post-filtering by category_id={request.category_id!r}")
+
+                # Determine acceptable match values (int and string forms)
+                match_values = {request.category_id}
+                try:
+                    if isinstance(request.category_id, str) and request.category_id.isdigit():
+                        match_values.add(int(request.category_id))
+                except Exception:
+                    pass
+
+                filtered_hits = []
+                for hit in fallback_hits:
+                    payload = hit.payload or {}
+                    pval = payload.get("category_id")
+                    if pval in match_values or (isinstance(pval, str) and pval in match_values) or (isinstance(pval, int) and str(pval) in match_values):
+                        filtered_hits.append(hit)
+
+                print(f"After post-filtering fallback hits, {len(filtered_hits)} hits match the category metadata")
+                # If we found matches, use them
+                if filtered_hits:
+                    search_result = filtered_hits
+                else:
+                    print("Fallback post-filtering found 0 matching hits; returning empty results for the category filter")
+            except Exception as e:
+                print(f"Fallback search failed: {e}")
 
         # Format results
         results = []
@@ -157,19 +224,26 @@ async def query_documents(request: QueryRequest):
             if hit.score > 0.1:  # Only include relevant chunks
                 context_chunks.append(hit.payload.get("content", ""))
 
-        # Generate answer using retrieved context
-        context = "\n\n".join(context_chunks)
-        answer = generate_answer(request.question, context)
+        # Return retrieved chunks and metadata; do NOT generate a final answer here.
+        # The backend LLM services (Llama/Gemini) will use these chunks to produce the final response.
+        source_chunks = []
+        for r in results:
+            source_chunks.append({
+                "text": r.get("content", ""),
+                "score": r.get("score"),
+                "file_path": r.get("file_path"),
+                "chunk_id": r.get("chunk_id"),
+                "category_id": r.get("category_id"),
+            })
 
         return JSONResponse(content={
             "question": request.question,
-            "answer": answer,
+            "source_chunks": source_chunks,
             "results": results,
             "total_results": len(results),
             "context_used": len(context_chunks),
             "category_filter": request.category_id
         }, status_code=200)
-
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error querying documents: {str(e)}")
 

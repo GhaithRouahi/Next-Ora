@@ -256,12 +256,21 @@ def ingest_file_to_vector_db(file_path, client, embedding_model, collection_name
                 "content_length": len(chunk)
             }
 
-            # Add category_id to payload if provided
-            if category_id:
-                payload["category_id"] = category_id
+            # Add category_id to payload if provided. Coerce numeric-looking IDs to int
+            if category_id is not None:
+                try:
+                    if isinstance(category_id, str) and category_id.isdigit():
+                        payload["category_id"] = int(category_id)
+                    else:
+                        payload["category_id"] = category_id
+                except Exception:
+                    payload["category_id"] = category_id
 
             points.append(qmodels.PointStruct(id=point_id, vector=vector, payload=payload))
 
+        # Debug: print a preview of the first payload to help with matching issues
+        if len(points) > 0:
+            print(f"First payload preview: {points[0].payload}")
         print(f"Storing {len(points)} points in vector database...")
         client.upsert(collection_name=collection_name, points=points)
 
