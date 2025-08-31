@@ -62,7 +62,7 @@ services:
 
   frontend:
     build:
-      context: ./next-ora-new
+      context: ./next-ora
       dockerfile: Dockerfile
       args:
         VITE_API_URL: http://10.9.21.110:3000/api
