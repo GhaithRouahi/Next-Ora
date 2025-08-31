@@ -38,9 +38,10 @@ services:
       MAIL_USER: gaithrouahi@gmail.com
       MAIL_PASS: "xubl hogw wrdx uwgi"
       MAIL_FROM_NAME: NextBrain
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyDQJwyVvyvAmuSLpl4bRgSRieuIVsOjsuQ}
       LLAMA_API_URL: ${LLAMA_API_URL:-http://host.docker.internal:11434/api/chat}
       VECTOR_DB_URL: http://qdrant:6333
+      RAG_SERVICE_URL: http://host.docker.internal:8001
     ports:
       - "3000:3000"
     depends_on:
@@ -60,7 +61,7 @@ services:
              npm run start:prod"
   frontend:
     build:
-      context: ./next-ora
+      context: ./next-ora-new
       dockerfile: Dockerfile
       args:
         VITE_API_URL: http://localhost:3000/api
