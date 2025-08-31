@@ -2,19 +2,60 @@ import os
 from pathlib import Path
 from typing import List, Optional
 from .utils import read_txt, read_pdf, read_docx, chunk_text
-from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 import uuid
+import hashlib
+import json
 
-MODEL_NAME = os.environ.get('EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
+print("Using ultra-lightweight built-in embeddings (no external ML models)")
+
+class SimpleEmbedding:
+    """Ultra-simple text embedding using TF-IDF-like approach with built-in libraries only"""
+    
+    def __init__(self):
+        self.vocab = {}
+        self.dimension = 384  # Standard embedding dimension
+    
+    def _get_words(self, text: str) -> List[str]:
+        """Simple tokenization"""
+        import re
+        words = re.findall(r'\w+', text.lower())
+        return [w for w in words if len(w) > 2]  # Filter short words
+    
+    def encode(self, text: str) -> List[float]:
+        """Create embedding vector from text"""
+        words = self._get_words(text)
+        
+        # Create a simple hash-based embedding
+        embedding = [0.0] * self.dimension
+        
+        for i, word in enumerate(words[:50]):  # Limit to first 50 words
+            # Use word hash to determine position in embedding vector
+            hash_val = hash(word)
+            positions = [abs(hash_val + j) % self.dimension for j in range(3)]
+            
+            # Set values at those positions (simple TF-like weighting)
+            weight = 1.0 / (i + 1)  # Give higher weight to earlier words
+            for pos in positions:
+                embedding[pos] += weight
+        
+        # Normalize the vector
+        magnitude = sum(x*x for x in embedding) ** 0.5
+        if magnitude > 0:
+            embedding = [x/magnitude for x in embedding]
+        
+        return embedding
 
 
 class Ingestor:
     def __init__(self, chroma_dir: str = './chroma_db', vector_db: str = None, vector_db_url: Optional[str] = None):
         self.vector_db = (vector_db or os.environ.get('VECTOR_DB', 'chroma')).lower()
-        self.embedding_model = SentenceTransformer(MODEL_NAME)
+        
+        # Use simple built-in embedding
+        self.embedding_model = SimpleEmbedding()
+            
         if self.vector_db == 'chroma':
             # If a remote Chroma server URL was provided, configure client to use it
             url = vector_db_url or os.environ.get('VECTOR_DB_URL')
@@ -26,10 +67,14 @@ class Ingestor:
             else:
                 # local chroma using duckdb+parquet
                 self.client = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory=chroma_dir))
-            # use chroma's embedding wrapper for consistency when using chroma-python collection add
-            self.embed_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name=MODEL_NAME)
+            # use chroma's default embedding function (no external dependencies)
+            self.embed_fn = embedding_functions.DefaultEmbeddingFunction()
         else:
             raise ValueError(f"Unsupported VECTOR_DB: {self.vector_db}")
+    
+    def get_embeddings(self, text: str) -> List[float]:
+        """Get embeddings for text using our simple built-in approach"""
+        return self.embedding_model.encode(text)
 
     def _read(self, path: str) -> str:
         p = Path(path)

@@ -65,22 +65,24 @@ services:
 
   # Vector DB - Chroma server
   chroma:
-    image: chromadb/chroma:0.4.5
+    image: chromadb/chroma:latest
     container_name: nextbrain-chroma
     environment:
       CHROMA_DATABASE: duckdb+parquet
       CHROMA_DB_IMPL: duckdb+parquet
+      ANONYMIZED_TELEMETRY: false
     ports:
       - "8000:8000"
     volumes:
-      - chroma_data:/chroma
+      - chroma_data:/chroma/chroma
     networks:
       - nextbrain-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # Frontend
   frontend:
@@ -106,6 +108,7 @@ services:
     build:
       context: ./rag-service
       dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: nextbrain-rag-service
     environment:
       VECTOR_DB: chroma
