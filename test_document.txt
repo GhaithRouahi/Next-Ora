@@ -1,0 +1,12 @@
+This is a test document for the RAG service.
+
+It contains some sample text that will be processed and stored in the vector database.
+
+The system should be able to:
+- Extract text from this file
+- Split it into chunks
+- Generate embeddings
+- Store the vectors in Qdrant
+- Allow querying and retrieval
+
+This demonstrates the basic functionality of the document ingestion pipeline.
