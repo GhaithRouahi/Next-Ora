@@ -2,14 +2,25 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 databases
+fastapi
+uvicorn
 pydantic
+qdrant-client
+langchain
+PyPDF2
+Pillow
+pytesseract
+python-docx
+numpy
 python-multipart
 requests
 openai
 aiofiles
-chromadb
+qdrant-client
 nltk
 python-docx
 pdfminer.six
 tqdm
 google-generativeai
+PyMuPDF  # Better PDF text extraction
+pdf2image  # For OCR fallback
