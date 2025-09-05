@@ -306,6 +306,93 @@ def clear_vector_db(collection_name="file_vectors"):
         print(f"Error clearing vector database: {e}")
         return {"error": f"Error clearing vector database: {str(e)}"}
 
+
+# --------- Additional utilities for inspecting indexed data ---------
+def list_indexed_files(client: QdrantClient, collection_name="file_vectors"):
+    """Return a summary of indexed files: file_path -> {chunks, categories}
+
+    This will iterate (scroll) through the collection payloads and aggregate
+    by the "file_path" payload field. It is resilient to payload shapes.
+    """
+    try:
+        files = {}
+        offset = 0
+        limit = 500
+
+        while True:
+            # scroll returns points with payloads; use with_payload=True
+            points = client.scroll(collection_name=collection_name, offset=offset, limit=limit, with_payload=True)
+            if not points:
+                break
+
+            for p in points:
+                # payload may be attribute or dict depending on qdrant-client version
+                payload = None
+                if hasattr(p, 'payload'):
+                    payload = p.payload
+                elif isinstance(p, dict):
+                    payload = p.get('payload')
+
+                if not payload:
+                    continue
+
+                file_path = payload.get('file_path') or payload.get('filePath') or payload.get('path')
+                if not file_path:
+                    continue
+
+                chunk_id = payload.get('chunk_id') or payload.get('chunkId') or 0
+                cat = payload.get('category_id') if 'category_id' in payload else payload.get('category') if 'category' in payload else None
+
+                entry = files.get(file_path)
+                if not entry:
+                    entry = {'file_path': file_path, 'chunks': 0, 'categories': set()}
+                    files[file_path] = entry
+
+                entry['chunks'] += 1
+                if cat is not None:
+                    entry['categories'].add(cat)
+
+            # advance offset
+            offset += len(points)
+            # if fewer than limit returned, we're done
+            if len(points) < limit:
+                break
+
+        # Convert category sets to lists for JSON serialization
+        out = []
+        for v in files.values():
+            out.append({
+                'file_path': v['file_path'],
+                'chunks': v['chunks'],
+                'categories': sorted(list(v['categories']))
+            })
+
+        return {'total_files': len(out), 'files': out}
+
+    except Exception as e:
+        print(f"Error listing indexed files: {e}")
+        return {'error': str(e)}
+
+
+def is_file_indexed(client: QdrantClient, file_path: str, collection_name="file_vectors"):
+    """Return True if any point in the collection has payload.file_path == file_path."""
+    try:
+        # Use scroll with a query_filter to find any matching payload quickly
+        query_filter = {
+            "must": [
+                {
+                    "key": "file_path",
+                    "match": {"value": file_path}
+                }
+            ]
+        }
+
+        points = client.scroll(collection_name=collection_name, limit=1, with_payload=True, query_filter=query_filter)
+        return bool(points and len(points) > 0)
+    except Exception as e:
+        print(f"Error checking if file is indexed: {e}")
+        return {'error': str(e)}
+
 # Main function to process multiple files
 def process_files(directory_path, collection_name="file_vectors", category_id=None):
     client, embedding_model = initialize_vector_db(collection_name)

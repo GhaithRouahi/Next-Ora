@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import uvicorn
 from app.ingest import initialize_vector_db, extract_content, split_text, ingest_file_to_vector_db, simple_text_embedding, clear_vector_db
+from app.ingest import list_indexed_files, is_file_indexed
 from pydantic import BaseModel
 from typing import Optional
 import google.generativeai as genai
@@ -257,6 +258,76 @@ async def clear_database():
         return JSONResponse(content=result, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error clearing database: {str(e)}")
+
+
+# Endpoint: list indexed files and categories
+@app.get("/indexed/files")
+async def indexed_files():
+    try:
+        client, _ = initialize_vector_db()
+        info = list_indexed_files(client)
+        return JSONResponse(content=info, status_code=200)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Endpoint: check if a file is indexed
+@app.get("/indexed/files/check")
+async def check_file_indexed(file_path: Optional[str] = None):
+    if not file_path:
+        raise HTTPException(status_code=400, detail="file_path query parameter is required")
+    try:
+        client, _ = initialize_vector_db()
+        result = is_file_indexed(client, file_path)
+        # If function returned a dict with error, bubble it up
+        if isinstance(result, dict) and 'error' in result:
+            raise Exception(result['error'])
+        return JSONResponse(content={'file_path': file_path, 'indexed': bool(result)}, status_code=200)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/indexed/files/by-category")
+async def indexed_files_by_category():
+    """Return files grouped by category with counts.
+
+    Response shape:
+    {
+      "total_categories": N,
+      "categories": [
+         { "category_id": <id|null>, "file_count": X, "files": [{"file_path":..., "chunks":...}, ...] },
+         ...
+      ]
+    }
+    """
+    try:
+        client, _ = initialize_vector_db()
+        info = list_indexed_files(client)
+        if isinstance(info, dict) and 'error' in info:
+            raise Exception(info['error'])
+
+        categories = {}
+        for f in info.get('files', []):
+            cats = f.get('categories') or []
+            # If file has no category, treat as uncategorized (None)
+            if not cats:
+                cats = [None]
+
+            for c in cats:
+                key = str(c) if c is not None else 'null'
+                entry = categories.get(key)
+                if not entry:
+                    entry = { 'category_id': c, 'files': [] }
+                    categories[key] = entry
+                entry['files'].append({ 'file_path': f.get('file_path'), 'chunks': f.get('chunks') })
+
+        out = []
+        for v in categories.values():
+            out.append({ 'category_id': v['category_id'], 'file_count': len(v['files']), 'files': v['files'] })
+
+        return JSONResponse(content={ 'total_categories': len(out), 'categories': out }, status_code=200)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)
